@@ -15,6 +15,12 @@ Uso:
 import os
 import requests
 from datetime import date, timedelta
+import os
+import requests
+from datetime import date, timedelta
+from dotenv import load_dotenv  # ← agregar
+
+load_dotenv()                   # ← agregar esta línea antes de los getenv
 
 
 # ── Configuración de series ────────────────────────────────────────────────
@@ -33,7 +39,7 @@ SERIES_BANXICO = {
 }
 
 # Indicador INEGI para inflación (INPC variación anual)
-INEGI_INDICADOR = "334360"
+INEGI_INDICADOR = "910406"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
