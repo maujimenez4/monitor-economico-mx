@@ -28,3 +28,8 @@ logs/
 *.swp
 *.swo
 .DS_Store
+
+# ── Base de datos ─────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
