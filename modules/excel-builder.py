@@ -76,9 +76,8 @@ def _color_variacion(valor: float | None) -> tuple[str, str]:
     return COLOR["neutro_bg"], COLOR["neutro_fg"]
 
 
-def _formatear_variacion(valor: float | None) -> str:
-    """Convierte un float de variación a string legible: +1.23% o N/A."""
-    if valor is None:
+def _formatear_variacion(valor) -> str:
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return "N/A"
     signo = "+" if valor >= 0 else ""
     return f"{signo}{valor:.2f}%"
@@ -149,9 +148,9 @@ def _construir_hoja_resumen(ws, df: pd.DataFrame, fecha_str: str):
         _aplicar_celda(ws, i, 2, row.descripcion, bg=bg_fila, alineacion=_izquierda())
 
         # Valor actual — formato según unidad
-        fmt_valor = '#,##0.4f' if row.indicador == "usd_fix" else '#,##0.00'
+        fmt_valor = '#,##0.0000' if row.indicador == "usd_fix" else '#,##0.00'
+                
         _aplicar_celda(ws, i, 3, row.valor, bg=bg_fila, formato=fmt_valor)
-
         _aplicar_celda(ws, i, 4, row.unidad,    bg=bg_fila, alineacion=_izquierda())
         _aplicar_celda(ws, i, 5, row.fecha_dato, bg=bg_fila)
 
