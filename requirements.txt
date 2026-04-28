@@ -1,24 +1,25 @@
 # Monitor Económico MX — dependencias
 # Instalar con: pip install -r requirements.txt
 
+
 # ── HTTP / APIs ───────────────────────────────────────────────────────────
-requests==2.32.3
+requests
 
 # ── Variables de entorno ──────────────────────────────────────────────────
-python-dotenv==1.0.1
+python-dotenv
 
 # ── Procesamiento de datos ────────────────────────────────────────────────
-pandas==2.2.2
+pandas
 
 # ── Generación de Excel ───────────────────────────────────────────────────
-openpyxl==3.1.4
+openpyxl
 
 # ── Scheduler ─────────────────────────────────────────────────────────────
-schedule==1.2.2
+schedule
 
 # ── API Web ───────────────────────────────────────────────────────────────
-flask==3.1.0
-flask-cors==5.0.0
+flask
+flask-cors
 
 # ── Servidor producción ───────────────────────────────────────────────────
-gunicorn==21.2.0
+gunicorn
