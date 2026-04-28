@@ -3,11 +3,11 @@ Módulo 4 — Envío por correo
 Monitor Económico MX
 
 Envía el Excel generado como adjunto por Gmail usando smtplib.
-El asunto incluye la fecha y el valor actual del dólar.
+Lee los destinatarios desde la BD de suscriptores (SQLite).
 
 Uso:
   Importado: from correo import enviar_reporte
-             ok = enviar_reporte(ruta_excel, datos_crudos)
+             resultados = enviar_reporte(ruta_excel, datos_crudos)
 """
 
 import os
@@ -22,58 +22,44 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GMAIL_USER        = os.getenv("GMAIL_USER")
+GMAIL_USER         = os.getenv("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-DESTINATARIO      = os.getenv("DESTINATARIO")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _construir_asunto(datos: dict) -> str:
     """
-    Construye el asunto del correo con fecha y valor del dólar.
-    Ejemplo: "Monitor MX — 27 abr 2026 | USD $17.38 (-0.12%)"
+    Ejemplo: "Monitor MX — 27 abr 2026 | USD $17.38"
     """
     fecha_str = date.today().strftime("%d %b %Y")
-
     usd_data  = datos.get("usd_fix", {})
     usd_valor = usd_data.get("valor")
-    usd_var   = None
-
-    # Intentar obtener variación diaria si viene en datos procesados
-    if usd_valor is not None:
-        usd_str = f"USD ${usd_valor:,.2f}"
-    else:
-        usd_str = "USD N/D"
-
-    # Indicar si hubo errores en la extracción
-    errores = datos.get("errores", [])
-    sufijo  = f" ⚠️ ({len(errores)} error(es))" if errores else ""
-
+    usd_str   = f"USD ${usd_valor:,.2f}" if usd_valor is not None else "USD N/D"
+    errores   = datos.get("errores", [])
+    sufijo    = f" ⚠️ ({len(errores)} error(es))" if errores else ""
     return f"Monitor MX — {fecha_str} | {usd_str}{sufijo}"
 
 
-def _construir_cuerpo(datos: dict) -> str:
+def _construir_cuerpo(datos: dict, nombre: str) -> str:
     """
-    Construye el cuerpo HTML del correo con un resumen de los indicadores.
+    Cuerpo HTML personalizado con el nombre del suscriptor.
     """
     fecha_str = date.today().strftime("%d de %B de %Y")
 
-    def _fila(nombre, dato):
+    def _fila(label, dato):
         valor = dato.get("valor")
         fecha = dato.get("fecha", "")
         error = dato.get("error")
-
         if error:
-            valor_str = f'<span style="color:#c00">Error al obtener dato</span>'
+            valor_str = '<span style="color:#c00">Error al obtener dato</span>'
         elif valor is None:
             valor_str = "N/D"
         else:
-            valor_str = f"{valor:,.4f}" if nombre == "USD/MXN (FIX)" else f"{valor:,.2f}"
-
+            valor_str = f"{valor:,.4f}" if label == "USD/MXN (FIX)" else f"{valor:,.2f}"
         return f"""
         <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{nombre}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{label}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;
                      text-align:right;font-weight:bold">{valor_str}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;
@@ -86,8 +72,7 @@ def _construir_cuerpo(datos: dict) -> str:
         ("CETES 28 días (%)",        datos.get("cetes_28d",  {})),
         ("Inflación INPC anual (%)", datos.get("inpc_anual", {})),
     ]
-
-    filas_html = "".join(_fila(nombre, dato) for nombre, dato in indicadores)
+    filas_html = "".join(_fila(n, d) for n, d in indicadores)
 
     errores = datos.get("errores", [])
     bloque_errores = ""
@@ -108,8 +93,7 @@ def _construir_cuerpo(datos: dict) -> str:
 
       <div style="background:#f9f9f9;padding:16px 24px;border:1px solid #e0e0e0">
         <p style="margin:0 0 12px;font-size:14px">
-          Adjunto encontrarás el reporte del día con los indicadores económicos
-          de México. Aquí un resumen rápido:
+          Hola <strong>{nombre}</strong>, aquí está tu reporte económico de hoy:
         </p>
 
         <table style="width:100%;border-collapse:collapse;background:#fff;
@@ -126,9 +110,9 @@ def _construir_cuerpo(datos: dict) -> str:
 
         {bloque_errores}
 
-        <p style="margin-top:16px;font-size:12px;color:#888">
+        <p style="margin-top:20px;font-size:12px;color:#888;border-top:1px solid #e0e0e0;padding-top:12px">
           Fuentes: Banco de México (Banxico) · INEGI<br>
-          Este correo es generado automáticamente por el Monitor Económico MX.
+          Para cancelar tu suscripción responde este correo con el asunto <em>BAJA</em>.
         </p>
       </div>
 
@@ -137,86 +121,122 @@ def _construir_cuerpo(datos: dict) -> str:
 
 
 def _validar_credenciales() -> list[str]:
-    """Verifica que todas las variables de entorno necesarias estén presentes."""
     faltantes = []
-    for var in ("GMAIL_USER", "GMAIL_APP_PASSWORD", "DESTINATARIO"):
+    for var in ("GMAIL_USER", "GMAIL_APP_PASSWORD"):
         if not os.getenv(var):
             faltantes.append(var)
     return faltantes
 
 
+def _enviar_a_uno(
+    nombre: str,
+    correo_destino: str,
+    asunto: str,
+    cuerpo_html: str,
+    ruta_excel: str,
+    archivo: Path
+) -> bool:
+    """
+    Envía el correo a un suscriptor específico.
+    Retorna True si fue exitoso.
+    """
+    msg            = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"]    = GMAIL_USER
+    msg["To"]      = correo_destino
+
+    msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
+
+    with open(ruta_excel, "rb") as f:
+        adjunto = MIMEApplication(f.read(), _subtype="xlsx")
+        adjunto.add_header("Content-Disposition", "attachment", filename=archivo.name)
+        msg.attach(adjunto)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            servidor.sendmail(GMAIL_USER, correo_destino, msg.as_string())
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print("  ERROR: App Password inválida — revisa GMAIL_APP_PASSWORD en .env")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"  ERROR SMTP enviando a {correo_destino}: {e}")
+        return False
+    except Exception as e:
+        print(f"  ERROR inesperado enviando a {correo_destino}: {e}")
+        return False
+
+
 # ── Función principal ──────────────────────────────────────────────────────
 
-def enviar_reporte(ruta_excel: str, datos: dict) -> bool:
+def enviar_reporte(ruta_excel: str, datos: dict) -> dict:
     """
-    Envía el reporte Excel por correo desde Gmail.
+    Envía el reporte a todos los suscriptores activos de la BD.
 
-    Parámetros:
-        ruta_excel: ruta absoluta al archivo .xlsx generado
-        datos:      dict de extraccion.obtener_datos() para construir asunto
-
-    Retorna:
-        True si el envío fue exitoso, False si hubo algún error.
+    Retorna un resumen:
+        {
+            "total":    3,
+            "enviados": 2,
+            "fallidos": 1,
+            "detalle":  [{"correo": "...", "ok": True}, ...]
+        }
     """
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from suscriptores import obtener_suscriptores_activos, inicializar_bd
+
     # ── Validar credenciales
     faltantes = _validar_credenciales()
     if faltantes:
         print(f"  ERROR: Faltan variables de entorno: {', '.join(faltantes)}")
-        print("  Verifica tu archivo .env")
-        return False
+        return {"total": 0, "enviados": 0, "fallidos": 0, "detalle": []}
 
-    # ── Verificar que el archivo existe
+    # ── Verificar archivo
     archivo = Path(ruta_excel)
     if not archivo.exists():
         print(f"  ERROR: No se encontró el archivo: {ruta_excel}")
-        return False
+        return {"total": 0, "enviados": 0, "fallidos": 0, "detalle": []}
 
-    print(f"  Preparando correo para: {DESTINATARIO}")
+    # ── Obtener suscriptores
+    inicializar_bd()
+    suscriptores = obtener_suscriptores_activos()
 
-    # ── Construir mensaje
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = _construir_asunto(datos)
-    msg["From"]    = GMAIL_USER
-    msg["To"]      = DESTINATARIO
+    if not suscriptores:
+        print("  AVISO: No hay suscriptores activos en la BD")
+        return {"total": 0, "enviados": 0, "fallidos": 0, "detalle": []}
 
-    # Cuerpo HTML
-    cuerpo_html = _construir_cuerpo(datos)
-    msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
+    print(f"  Enviando a {len(suscriptores)} suscriptor(es)...")
 
-    # Adjunto Excel
-    with open(ruta_excel, "rb") as f:
-        adjunto = MIMEApplication(f.read(), _subtype="xlsx")
-        adjunto.add_header(
-            "Content-Disposition",
-            "attachment",
-            filename=archivo.name
-        )
-        msg.attach(adjunto)
+    asunto   = _construir_asunto(datos)
+    detalle  = []
+    enviados = 0
+    fallidos = 0
 
-    # ── Enviar via Gmail SMTP
-    print("  Conectando con Gmail SMTP...")
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-            servidor.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            servidor.sendmail(GMAIL_USER, DESTINATARIO, msg.as_string())
+    for sub in suscriptores:
+        nombre = sub["nombre"]
+        correo = sub["correo"]
+        cuerpo = _construir_cuerpo(datos, nombre)
 
-        print(f"  Correo enviado exitosamente a {DESTINATARIO}")
-        print(f"  Asunto: {msg['Subject']}")
-        return True
+        ok     = _enviar_a_uno(nombre, correo, asunto, cuerpo, ruta_excel, archivo)
 
-    except smtplib.SMTPAuthenticationError:
-        print("  ERROR: Autenticación fallida.")
-        print("  Verifica que GMAIL_APP_PASSWORD sea una App Password válida,")
-        print("  no tu contraseña normal de Gmail.")
-        return False
+        estado = "✓" if ok else "✗"
+        print(f"  {estado} {nombre:<15} {correo}")
 
-    except smtplib.SMTPException as e:
-        print(f"  ERROR SMTP: {e}")
-        return False
+        detalle.append({"correo": correo, "nombre": nombre, "ok": ok})
+        if ok:
+            enviados += 1
+        else:
+            fallidos += 1
 
-    except Exception as e:
-        print(f"  ERROR inesperado al enviar correo: {e}")
-        return False
+    print(f"\n  Resumen: {enviados} enviados, {fallidos} fallidos de {len(suscriptores)} total")
+
+    return {
+        "total":    len(suscriptores),
+        "enviados": enviados,
+        "fallidos": fallidos,
+        "detalle":  detalle,
+    }
 
 
 # ── Ejecución directa ──────────────────────────────────────────────────────
@@ -225,7 +245,7 @@ if __name__ == "__main__":
     import sys
     sys.path.append(str(Path(__file__).parent))
 
-    from extraccion   import obtener_datos
+    from extraccion    import obtener_datos
     from procesamiento import procesar_datos
     from excel_builder import generar_excel
 
@@ -238,10 +258,7 @@ if __name__ == "__main__":
     print("\n── Generando Excel...")
     ruta = generar_excel(df_resumen, df_historico)
 
-    print("\n── Enviando correo...")
-    exito = enviar_reporte(ruta, datos_crudos)
+    print("\n── Enviando a suscriptores...")
+    resultado = enviar_reporte(ruta, datos_crudos)
 
-    if exito:
-        print("\nPipeline completo ejecutado exitosamente.")
-    else:
-        print("\nPipeline completado con errores en el envío.")
+    print(f"\nPipeline completo — {resultado['enviados']}/{resultado['total']} enviados")
