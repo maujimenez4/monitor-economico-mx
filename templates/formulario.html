@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Monitor Económico MX — Suscríbete</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --navy:       #1F3864;
+      --blue:       #2E75B6;
+      --blue-light: #DEEAF1;
+      --blue-mid:   #BDD7EE;
+      --green:      #375623;
+      --green-bg:   #E2EFDA;
+      --white:      #FFFFFF;
+      --gray:       #595959;
+      --gray-light: #F2F2F2;
+      --border:     #BDD7EE;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--navy);
+      font-family: 'DM Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Fondo con patrón geométrico sutil */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(46,117,182,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(46,117,182,0.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* Glow de fondo */
+    body::after {
+      content: '';
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(46,117,182,0.18) 0%, transparent 70%);
+      top: -100px;
+      right: -100px;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(46,117,182,0.15),
+        0 32px 80px rgba(0,0,0,0.4);
+      position: relative;
+      z-index: 1;
+      animation: slideUp 0.6s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      padding: 32px 36px 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -24px;
+      right: -24px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(46,117,182,0.2);
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(46,117,182,0.3);
+      border: 1px solid rgba(189,215,238,0.3);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--blue-mid);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .header-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--white);
+      line-height: 1.2;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header h1 span {
+      color: var(--blue-mid);
+    }
+
+    .header p {
+      font-size: 14px;
+      color: rgba(168,196,224,0.85);
+      line-height: 1.6;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Indicadores preview ── */
+    .indicators {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: var(--blue);
+      padding: 0;
+    }
+
+    .indicator-item {
+      padding: 12px 10px;
+      text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .indicator-item:last-child { border-right: none; }
+
+    .indicator-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+    }
+
+    .indicator-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .indicator-change {
+      font-size: 9px;
+      color: #81C784;
+      margin-top: 1px;
+    }
+
+    /* ── Cuerpo del formulario ── */
+    .body {
+      padding: 32px 36px 36px;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .section-sub {
+      font-size: 13px;
+      color: var(--gray);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--navy);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--navy);
+      background: var(--white);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .field input::placeholder { color: #aab; }
+
+    .field input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(46,117,182,0.12);
+    }
+
+    .field input.error {
+      border-color: #e53935;
+      box-shadow: 0 0 0 3px rgba(229,57,53,0.1);
+    }
+
+    /* ── Botón ── */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--blue);
+      box-shadow: 0 8px 24px rgba(46,117,182,0.35);
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Mensajes de estado ── */
+    .mensaje {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.5;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .mensaje.exito {
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid #b8d4a0;
+      display: block;
+    }
+
+    .mensaje.error-msg {
+      background: #FFEBEE;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+      display: block;
+    }
+
+    /* ── Features ── */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--gray);
+    }
+
+    .feature-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--blue-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 16px 36px;
+      background: var(--gray-light);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer p {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .footer-sources {
+      font-size: 10px;
+      color: #aaa;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">En vivo · Datos diarios</div>
+    <h1>Monitor<br/>Económico <span>MX</span></h1>
+    <p>Recibe cada mañana los indicadores clave de México directo en tu correo.</p>
+  </div>
+
+  <!-- Indicadores decorativos -->
+  <div class="indicators">
+    <div class="indicator-item">
+      <div class="indicator-label">USD/MXN</div>
+      <div class="indicator-value">17.38</div>
+      <div class="indicator-change">▼ -0.12%</div>
+    </div>
+    <div class="indicator-item">
+      <div class="indicator-label">TIIE 28d</div>
+      <div class="indicator-value">7.03%</div>
+      <div class="indicator-change">— anual</div>
+    </div>
+    <div class="indicator-item">
+      <div class="indicator-label">CETES</div>
+      <div class="indicator-value">6.55%</div>
+      <div class="indicator-change">— 28 días</div>
+    </div>
+    <div class="indicator-item">
+      <div class="indicator-label">INPC</div>
+      <div class="indicator-value">4.59%</div>
+      <div class="indicator-change">— anual</div>
+    </div>
+  </div>
+
+  <!-- Cuerpo -->
+  <div class="body">
+
+    <p class="section-title">Suscríbete gratis</p>
+    <p class="section-sub">Un reporte Excel en tu correo cada mañana. Sin spam, solo datos.</p>
+
+    <div class="features">
+      <div class="feature-item">
+        <div class="feature-icon">📊</div>
+        <span>Tipo de cambio, TIIE, CETES e inflación INPC</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📅</div>
+        <span>Histórico de 30 días con variaciones diarias</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">⏰</div>
+        <span>Entrega automática cada mañana antes de las 8am</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="nombre">Nombre</label>
+      <input type="text" id="nombre" placeholder="Tu nombre" autocomplete="given-name"/>
+    </div>
+
+    <div class="field">
+      <label for="correo">Correo electrónico</label>
+      <input type="email" id="correo" placeholder="tu@correo.com" autocomplete="email"/>
+    </div>
+
+    <button class="btn" id="btn-suscribir" onclick="suscribir()">
+      <span class="btn-spinner" id="spinner"></span>
+      <span id="btn-texto">Quiero recibir el monitor</span>
+    </button>
+
+    <div class="mensaje" id="mensaje"></div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Sin spam · Cancela cuando quieras</p>
+    <p class="footer-sources">Fuentes: Banxico · INEGI</p>
+  </div>
+
+</div>
+
+<script>
+  async function suscribir() {
+    const nombre  = document.getElementById("nombre").value.trim();
+    const correo  = document.getElementById("correo").value.trim();
+    const btn     = document.getElementById("btn-suscribir");
+    const spinner = document.getElementById("spinner");
+    const texto   = document.getElementById("btn-texto");
+    const mensaje = document.getElementById("mensaje");
+
+    // Limpiar estado anterior
+    mensaje.className = "mensaje";
+    mensaje.textContent = "";
+    document.getElementById("nombre").classList.remove("error");
+    document.getElementById("correo").classList.remove("error");
+
+    // Validación frontend
+    if (!nombre) {
+      document.getElementById("nombre").classList.add("error");
+      mostrarMensaje("Por favor ingresa tu nombre.", false);
+      return;
+    }
+    if (!correo || !correo.includes("@")) {
+      document.getElementById("correo").classList.add("error");
+      mostrarMensaje("Por favor ingresa un correo válido.", false);
+      return;
+    }
+
+    // Loading state
+    btn.disabled    = true;
+    spinner.style.display = "block";
+    texto.textContent     = "Enviando...";
+
+    try {
+      const res = await fetch("/suscribir", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ nombre, correo }),
+      });
+
+      const data = await res.json();
+      mostrarMensaje(data.mensaje, data.ok);
+
+      if (data.ok) {
+        document.getElementById("nombre").value = "";
+        document.getElementById("correo").value = "";
+      }
+
+    } catch (err) {
+      mostrarMensaje("Error de conexión. Intenta de nuevo.", false);
+    } finally {
+      btn.disabled          = false;
+      spinner.style.display = "none";
+      texto.textContent     = "Quiero recibir el monitor";
+    }
+  }
+
+  function mostrarMensaje(texto, exito) {
+    const el = document.getElementById("mensaje");
+    el.textContent = texto;
+    el.className   = "mensaje " + (exito ? "exito" : "error-msg");
+  }
+
+  // Submit con Enter
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") suscribir();
+  });
+</script>
+
+</body>
+</html>
