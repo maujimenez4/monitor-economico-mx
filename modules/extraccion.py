@@ -132,7 +132,7 @@ def obtener_inpc_inegi() -> dict:
     """
     url = (
         f"{INEGI_BASE}/{INEGI_INDICADOR}"
-        f"/es/0700/false/BIE/2.0/{INEGI_TOKEN}?type=json"
+        f"/es/00/true/BIE-BISE/2.0/{INEGI_TOKEN}?type=json"
     )
 
     try:
