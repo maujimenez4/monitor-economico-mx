@@ -1,75 +1,84 @@
-# Monitor Económico MX
+# Monitor Económico MX — Evolved
 
-Pipeline automático que extrae indicadores económicos de México (Banxico + INEGI), los procesa con pandas y envía un reporte Excel cada mañana por correo.
+Evolución del [Monitor Económico MX](https://github.com/maujimenez4/monitor-economico-mx) original.
+Migra de un script de envío por correo a una arquitectura con base de datos persistente, API REST y (próximamente) dashboard y agente conversacional.
+
+## Versiones
+
+| Versión | Estado | Descripción |
+|---------|--------|-------------|
+| **V1** | ✅ En desarrollo | PostgreSQL + FastAPI + Docker |
+| V2 | 🔜 Planeada | Dashboard Power BI / Metabase |
+| V3 | 🔜 Planeada | Agente conversacional LangChain + Claude |
+
+## Stack V1
+
+- **Python 3.12** — scraper de indicadores económicos
+- **PostgreSQL 16** — base de datos persistente
+- **FastAPI** — API REST para consultar los datos
+- **Docker + docker-compose** — containerización completa
+- **Railway** — deploy en la nube
 
 ## Indicadores incluidos
 
 | Indicador | Fuente | Serie |
-|---|---|---|
+|-----------|--------|-------|
 | Tipo de cambio USD/MXN (FIX) | Banxico | SF43718 |
 | TIIE a 28 días | Banxico | SF60648 |
 | CETES a 28 días | Banxico | SF60633 |
 | Inflación INPC anual | INEGI | 628229 |
 
-## Instalación
+## Requisitos
+
+- Docker Desktop
+- Git
+- Tokens de Banxico e INEGI
+
+## Instalación local
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/monitor-economico-mx.git
+# 1. Clonar y cambiar a la rama evolved
+git clone https://github.com/maujimenez4/monitor-economico-mx.git
 cd monitor-economico-mx
+git checkout evolved/v1
 
-# 2. Crear entorno virtual
-python -m venv .venv
-source .venv/bin/activate        # Mac/Linux
-.venv\Scripts\activate           # Windows
-
-# 3. Instalar dependencias
-pip install -r requirements.txt
-
-# 4. Configurar credenciales
+# 2. Configurar variables de entorno
 cp .env.example .env
 # Editar .env con tus tokens y credenciales
+
+# 3. Levantar todos los servicios
+docker compose up --build
+
+# 4. Verificar que la API responde
+curl http://localhost:8000/health
 ```
 
-## Configuración
+## Endpoints V1
 
-Edita el archivo `.env` con tus credenciales:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/health` | Estado del servidor |
+| GET | `/indicadores/latest` | Último snapshot diario |
+| GET | `/indicadores/historico` | Serie de tiempo filtrable |
 
-- **BANXICO_TOKEN** — solicitar en [banxico.org.mx/SieAPIRest](https://www.banxico.org.mx/SieAPIRest/service/v1/)
-- **INEGI_TOKEN** — solicitar en [inegi.org.mx](https://www.inegi.org.mx/servicios/api_indicadores.html)
-- **GMAIL_APP_PASSWORD** — generar en Google Account → Seguridad → Contraseñas de aplicaciones
-
-## Uso
-
-```bash
-# Ejecutar una vez manualmente
-python main.py --once
-
-# Iniciar el scheduler diario (corre en segundo plano)
-python main.py
-```
-
-## Estructura
+## Estructura del proyecto
 
 ```
-monitor-economico-mx/
-├── .env                  # Credenciales (no se sube a GitHub)
-├── .env.example          # Plantilla de credenciales
-├── .gitignore
-├── requirements.txt
-├── README.md
-├── main.py               # Orquestador del pipeline
-├── modules/
-│   ├── extraccion.py     # Módulo 1 — Banxico + INEGI APIs
-│   ├── procesamiento.py  # Módulo 2 — pandas
-│   ├── excel_builder.py  # Módulo 3 — openpyxl
-│   └── correo.py         # Módulo 4 — smtplib
-└── outputs/              # Excel generados (ignorado por git)
+monitor-economico-mx/  (rama evolved/v1)
+├── scraper/
+│   ├── modules/          # extraccion, procesamiento, excel_builder, correo
+│   ├── main.py           # orquestador + scheduler
+│   ├── models.py         # modelos SQLAlchemy
+│   ├── database.py       # conexión PostgreSQL
+│   ├── init.sql          # schema inicial
+│   ├── Dockerfile
+│   └── requirements.txt
+├── backend/
+│   ├── main.py           # FastAPI + endpoints
+│   ├── database.py       # sesión SQLAlchemy
+│   ├── Dockerfile
+│   └── requirements.txt
+├── docker-compose.yml
+├── .env.example
+└── README.md
 ```
-
-## Reporte generado
-
-El pipeline genera un `.xlsx` con dos hojas:
-
-- **Resumen del día** — valor actual de cada indicador con variación diaria y semanal, coloreado en verde/rojo
-- **Histórico 30 días** — serie de tiempo del tipo de cambio con máximos y mínimos del mes
