@@ -1,0 +1,18 @@
+# APIs y HTTP
+requests==2.32.3
+
+# Procesamiento de datos
+pandas==2.2.3
+
+# Base de datos
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+
+# Scheduler
+schedule==1.2.2
+
+# Variables de entorno
+python-dotenv==1.0.1
+
+# Excel (compatibilidad con V1 original)
+openpyxl==3.1.5
