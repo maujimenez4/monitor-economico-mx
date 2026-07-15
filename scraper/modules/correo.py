@@ -1,13 +1,9 @@
 """
 Módulo 4 — Envío por correo
-Monitor Económico MX
+Monitor Económico MX — Evolved
 
 Envía el Excel generado como adjunto por Gmail usando smtplib.
-Lee los destinatarios desde la BD de suscriptores (SQLite).
-
-Uso:
-  Importado: from correo import enviar_reporte
-             resultados = enviar_reporte(ruta_excel, datos_crudos)
+Lee los destinatarios desde PostgreSQL (migrado desde SQLite).
 """
 
 import os
@@ -29,9 +25,6 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _construir_asunto(datos: dict) -> str:
-    """
-    Ejemplo: "Monitor MX — 27 abr 2026 | USD $17.38"
-    """
     fecha_str = date.today().strftime("%d %b %Y")
     usd_data  = datos.get("usd_fix", {})
     usd_valor = usd_data.get("valor")
@@ -42,9 +35,6 @@ def _construir_asunto(datos: dict) -> str:
 
 
 def _construir_cuerpo(datos: dict, nombre: str) -> str:
-    """
-    Cuerpo HTML personalizado con el nombre del suscriptor.
-    """
     fecha_str = date.today().strftime("%d de %B de %Y")
 
     def _fila(label, dato):
@@ -134,12 +124,8 @@ def _enviar_a_uno(
     asunto: str,
     cuerpo_html: str,
     ruta_excel: str,
-    archivo: Path
+    archivo: Path,
 ) -> bool:
-    """
-    Envía el correo a un suscriptor específico.
-    Retorna True si fue exitoso.
-    """
     msg            = MIMEMultipart("alternative")
     msg["Subject"] = asunto
     msg["From"]    = GMAIL_USER
@@ -172,19 +158,11 @@ def _enviar_a_uno(
 
 def enviar_reporte(ruta_excel: str, datos: dict) -> dict:
     """
-    Envía el reporte a todos los suscriptores activos de la BD.
-
-    Retorna un resumen:
-        {
-            "total":    3,
-            "enviados": 2,
-            "fallidos": 1,
-            "detalle":  [{"correo": "...", "ok": True}, ...]
-        }
+    Envía el reporte a todos los suscriptores activos en PostgreSQL.
     """
     import sys
     sys.path.append(str(Path(__file__).parent))
-    from suscriptores import obtener_suscriptores_activos, inicializar_bd
+    from suscriptores import obtener_suscriptores_activos  # ← sin inicializar_bd
 
     # ── Validar credenciales
     faltantes = _validar_credenciales()
@@ -198,9 +176,15 @@ def enviar_reporte(ruta_excel: str, datos: dict) -> dict:
         print(f"  ERROR: No se encontró el archivo: {ruta_excel}")
         return {"total": 0, "enviados": 0, "fallidos": 0, "detalle": []}
 
-    # ── Obtener suscriptores
-    inicializar_bd()
-    suscriptores = obtener_suscriptores_activos()
+    # ── Obtener suscriptores desde PostgreSQL
+    import sys
+    sys.path.append(str(Path(__file__).parent.parent))
+    from database import SessionLocal
+    session = SessionLocal()
+    try:
+        suscriptores = obtener_suscriptores_activos(session)
+    finally:
+        session.close()
 
     if not suscriptores:
         print("  AVISO: No hay suscriptores activos en la BD")
@@ -217,7 +201,6 @@ def enviar_reporte(ruta_excel: str, datos: dict) -> dict:
         nombre = sub["nombre"]
         correo = sub["correo"]
         cuerpo = _construir_cuerpo(datos, nombre)
-
         ok     = _enviar_a_uno(nombre, correo, asunto, cuerpo, ruta_excel, archivo)
 
         estado = "✓" if ok else "✗"
@@ -230,35 +213,4 @@ def enviar_reporte(ruta_excel: str, datos: dict) -> dict:
             fallidos += 1
 
     print(f"\n  Resumen: {enviados} enviados, {fallidos} fallidos de {len(suscriptores)} total")
-
-    return {
-        "total":    len(suscriptores),
-        "enviados": enviados,
-        "fallidos": fallidos,
-        "detalle":  detalle,
-    }
-
-
-# ── Ejecución directa ──────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-
-    from extraccion    import obtener_datos
-    from procesamiento import procesar_datos
-    from excel_builder import generar_excel
-
-    print("── Extrayendo datos...")
-    datos_crudos = obtener_datos()
-
-    print("\n── Procesando datos...")
-    df_resumen, df_historico = procesar_datos(datos_crudos)
-
-    print("\n── Generando Excel...")
-    ruta = generar_excel(df_resumen, df_historico)
-
-    print("\n── Enviando a suscriptores...")
-    resultado = enviar_reporte(ruta, datos_crudos)
-
-    print(f"\nPipeline completo — {resultado['enviados']}/{resultado['total']} enviados")
+    return {"total": len(suscriptores), "enviados": enviados, "fallidos": fallidos, "detalle": detalle}
