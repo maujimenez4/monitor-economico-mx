@@ -1,20 +1,22 @@
 services:
 
+  # ── PostgreSQL local (solo para desarrollo sin Supabase) ──────────────────
+  # Para usar Supabase en producción, configurar DATABASE_URL en .env
   postgres:
     image: postgres:16-alpine
     container_name: monitor_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-monitor_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitor_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-monitor_economico}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scraper/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-monitor_user} -d ${POSTGRES_DB:-monitor_economico}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,11 +28,10 @@ services:
     container_name: monitor_scraper
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}        # Lee directo del .env (Supabase o local)
       BANXICO_TOKEN: ${BANXICO_TOKEN}
       INEGI_TOKEN: ${INEGI_TOKEN}
       HORA_ENVIO: ${HORA_ENVIO:-07:30}
-      # Compatibilidad con la V1 original (correo opcional)
       GMAIL_USER: ${GMAIL_USER:-}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
       DESTINATARIO: ${DESTINATARIO:-}
@@ -48,7 +49,7 @@ services:
     container_name: monitor_fastapi
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}        # Lee directo del .env (Supabase o local)
     ports:
       - "8000:8000"
     depends_on:
