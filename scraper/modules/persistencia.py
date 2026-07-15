@@ -64,36 +64,33 @@ def guardar_indicador_diario(
 def guardar_historico(session: Session, df_historico: pd.DataFrame) -> int:
     """
     Inserta las filas del DataFrame histórico en la tabla historico.
-    Espera un DataFrame con columnas: fecha, serie_id, valor.
-    Devuelve el número de filas procesadas.
 
-    El DataFrame viene de procesamiento.py original — que genera
-    el histórico de 30 días del tipo de cambio. Aquí lo expandimos
-    para guardar todas las series disponibles.
+    df_historico viene de procesamiento.py con columnas:
+        fecha | usd_fix | var_diaria | max_mes | min_mes
+
+    Solo contiene la serie del tipo de cambio (SF43718 / usd_fix).
+    Se guarda con serie_id="SF43718" para mantener consistencia con
+    la tabla historico y facilitar las consultas de V2 (Power BI).
     """
     if df_historico.empty:
         log.warning("DataFrame histórico vacío, no se guardó nada")
         return 0
 
+    meta = SERIES_META["SF43718"]
     filas_procesadas = 0
 
     for _, row in df_historico.iterrows():
-        serie_id = str(row.get("serie_id", "SF43718"))
-        meta = SERIES_META.get(serie_id, {
-            "nombre": serie_id,
-            "fuente": "desconocido",
-        })
-
+        valor = row.get("usd_fix")
         stmt = (
             insert(Historico)
             .values(
                 fecha=row["fecha"],
-                serie_id=serie_id,
+                serie_id="SF43718",
                 nombre=meta["nombre"],
-                valor=row.get("valor") if pd.notna(row.get("valor")) else None,
+                valor=float(valor) if pd.notna(valor) else None,
                 fuente=meta["fuente"],
             )
-            .on_conflict_do_nothing()  # si ya existe (fecha, serie_id), omitir
+            .on_conflict_do_nothing()
         )
         session.execute(stmt)
         filas_procesadas += 1
@@ -119,24 +116,24 @@ def guardar_todo(
     resultado = {"indicador_guardado": False, "filas_historico": 0, "errores": []}
 
     try:
-        # Extraer valores actuales del df_resumen
-        # El resumen tiene una fila por indicador con columna 'valor_actual'
-        def _valor(serie_id: str) -> Optional[float]:
+        # df_resumen tiene columnas: indicador, valor, fuente, error, ...
+        # con valores en 'indicador': usd_fix, tiie_28d, cetes_28d, inpc_anual
+        def _valor(indicador: str) -> Optional[float]:
             if df_resumen.empty:
                 return None
-            fila = df_resumen[df_resumen["serie_id"] == serie_id]
-            if fila.empty:
+            fila = df_resumen[df_resumen["indicador"] == indicador]
+            if fila.empty or fila["error"].values[0] is not None:
                 return None
-            v = fila["valor_actual"].values[0]
+            v = fila["valor"].values[0]
             return float(v) if pd.notna(v) else None
 
         guardar_indicador_diario(
             session=session,
             fecha=date.today(),
-            tipo_cambio=_valor("SF43718"),
-            tiie_28=_valor("SF60648"),
-            cetes_28=_valor("SF60633"),
-            inpc_anual=_valor("628229"),
+            tipo_cambio=_valor("usd_fix"),
+            tiie_28=_valor("tiie_28d"),
+            cetes_28=_valor("cetes_28d"),
+            inpc_anual=_valor("inpc_anual"),
         )
         resultado["indicador_guardado"] = True
 
