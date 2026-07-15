@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -35,3 +35,13 @@ class Historico(Base):
     valor:     Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4))
     fuente:    Mapped[str]              = mapped_column(String(20), nullable=False)
     creado_en: Mapped[datetime]          = mapped_column(DateTime, server_default=func.now())
+
+
+class Suscriptor(Base):
+    __tablename__ = "suscriptores"
+
+    id:                Mapped[int]      = mapped_column(Integer, primary_key=True)
+    nombre:            Mapped[str]      = mapped_column(String(100), nullable=False)
+    correo:            Mapped[str]      = mapped_column(String(150), nullable=False, unique=True)
+    fecha_suscripcion: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    activo:            Mapped[bool]     = mapped_column(Boolean, nullable=False, default=True)

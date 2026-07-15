@@ -1,72 +1,37 @@
 """
-Módulo — Base de datos de suscriptores
-Monitor Económico MX
+Módulo — Suscriptores
+Monitor Económico MX — Evolved
 
-Maneja el CRUD de suscriptores usando SQLite.
-No requiere instalar nada — SQLite viene incluido en Python.
+Migrado de SQLite (suscriptores.db) a PostgreSQL.
+La lógica de negocio es idéntica a la versión original —
+solo cambia la capa de acceso a datos: sqlite3 → SQLAlchemy.
 
 Uso:
-  from modules.suscriptores import (
-      inicializar_bd,
-      agregar_suscriptor,
-      obtener_suscriptores_activos,
-      desactivar_suscriptor,
-  )
+    from modules.suscriptores import (
+        agregar_suscriptor,
+        obtener_suscriptores_activos,
+        desactivar_suscriptor,
+    )
 """
 
-import sqlite3
+import logging
 from datetime import datetime
-from pathlib import Path
 
-# BD en la raíz del proyecto
-DB_PATH = Path(__file__).parent.parent / "suscriptores.db"
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
+from models import Suscriptor
 
-# ── Conexión ───────────────────────────────────────────────────────────────
-
-def _conectar() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row   # permite acceder columnas por nombre
-    return conn
+log = logging.getLogger(__name__)
 
 
-# ── Inicialización ─────────────────────────────────────────────────────────
-
-def inicializar_bd():
+def agregar_suscriptor(session: Session, nombre: str, correo: str) -> dict:
     """
-    Crea la tabla suscriptores si no existe.
-    Es seguro llamarla múltiples veces — usa CREATE TABLE IF NOT EXISTS.
-
-    Columnas:
-        id              INTEGER  PK autoincremental
-        nombre          TEXT     nombre del suscriptor
-        correo          TEXT     único, obligatorio
-        fecha_suscripcion TEXT   ISO 8601: '2026-04-27 07:30:00'
-        activo          INTEGER  1 = activo, 0 = dado de baja
-    """
-    with _conectar() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS suscriptores (
-                id                INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre            TEXT    NOT NULL,
-                correo            TEXT    NOT NULL UNIQUE,
-                fecha_suscripcion TEXT    NOT NULL,
-                activo            INTEGER NOT NULL DEFAULT 1
-            )
-        """)
-        conn.commit()
-    print(f"BD inicializada: {DB_PATH}")
-
-
-# ── CRUD ───────────────────────────────────────────────────────────────────
-
-def agregar_suscriptor(nombre: str, correo: str) -> dict:
-    """
-    Agrega un suscriptor nuevo.
+    Agrega un suscriptor nuevo o reactiva uno dado de baja.
 
     Retorna:
-        { "ok": True,  "mensaje": "Suscriptor agregado" }
-        { "ok": False, "mensaje": "El correo ya está registrado" }
+        { "ok": True,  "mensaje": "..." }
+        { "ok": False, "mensaje": "..." }
     """
     correo = correo.strip().lower()
     nombre = nombre.strip()
@@ -77,128 +42,90 @@ def agregar_suscriptor(nombre: str, correo: str) -> dict:
     if not nombre:
         return {"ok": False, "mensaje": "El nombre es obligatorio"}
 
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # ¿Ya existe este correo?
+    existente = session.query(Suscriptor).filter_by(correo=correo).first()
 
+    if existente:
+        if existente.activo:
+            return {"ok": False, "mensaje": "Este correo ya está suscrito"}
+        # Reactivar suscripción dada de baja
+        existente.activo = True
+        existente.nombre = nombre
+        existente.fecha_suscripcion = datetime.now()
+        session.flush()
+        log.info(f"Suscriptor reactivado: {correo}")
+        return {"ok": True, "mensaje": f"¡Bienvenido de vuelta {nombre}! Tu suscripción fue reactivada."}
+
+    # Suscriptor nuevo
+    nuevo = Suscriptor(nombre=nombre, correo=correo)
+    session.add(nuevo)
     try:
-        with _conectar() as conn:
-            conn.execute(
-                "INSERT INTO suscriptores (nombre, correo, fecha_suscripcion) VALUES (?, ?, ?)",
-                (nombre, correo, fecha)
-            )
-            conn.commit()
-        return {"ok": True, "mensaje": f"¡Listo {nombre}! Te suscribiste correctamente."}
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        return {"ok": False, "mensaje": "Este correo ya está suscrito"}
 
-    except sqlite3.IntegrityError:
-        # El UNIQUE de correo lanzó error — correo ya existe
-        # Puede estar activo o dado de baja — reactivar si estaba inactivo
-        with _conectar() as conn:
-            row = conn.execute(
-                "SELECT activo FROM suscriptores WHERE correo = ?", (correo,)
-            ).fetchone()
-
-        if row and row["activo"] == 0:
-            # Reactivar suscripción
-            with _conectar() as conn:
-                conn.execute(
-                    "UPDATE suscriptores SET activo = 1, fecha_suscripcion = ? WHERE correo = ?",
-                    (fecha, correo)
-                )
-                conn.commit()
-            return {"ok": True, "mensaje": f"¡Bienvenido de vuelta {nombre}! Tu suscripción fue reactivada."}
-
-        return {"ok": False, "mensaje": "Este correo ya está suscrito."}
+    log.info(f"Suscriptor agregado: {correo}")
+    return {"ok": True, "mensaje": f"¡Listo {nombre}! Te suscribiste correctamente."}
 
 
-def obtener_suscriptores_activos() -> list[dict]:
+def obtener_suscriptores_activos(session: Session) -> list[dict]:
     """
     Devuelve todos los suscriptores activos como lista de dicts.
-
-    Ejemplo de un elemento:
+    Lo usa correo.py para saber a quiénes enviar el reporte.
+    """
+    suscriptores = (
+        session.query(Suscriptor)
+        .filter_by(activo=True)
+        .order_by(Suscriptor.fecha_suscripcion)
+        .all()
+    )
+    return [
         {
-            "id": 1,
-            "nombre": "Mauricio",
-            "correo": "mauricio@gmail.com",
-            "fecha_suscripcion": "2026-04-27 07:30:00"
+            "id":                s.id,
+            "nombre":            s.nombre,
+            "correo":            s.correo,
+            "fecha_suscripcion": s.fecha_suscripcion.strftime("%Y-%m-%d %H:%M:%S"),
         }
+        for s in suscriptores
+    ]
+
+
+def desactivar_suscriptor(session: Session, correo: str) -> dict:
     """
-    with _conectar() as conn:
-        rows = conn.execute(
-            "SELECT id, nombre, correo, fecha_suscripcion "
-            "FROM suscriptores WHERE activo = 1 ORDER BY fecha_suscripcion"
-        ).fetchall()
-
-    return [dict(row) for row in rows]
-
-
-def desactivar_suscriptor(correo: str) -> dict:
-    """
-    Da de baja a un suscriptor (soft delete — no borra el registro).
-
-    Retorna:
-        { "ok": True,  "mensaje": "Suscripción cancelada" }
-        { "ok": False, "mensaje": "Correo no encontrado" }
+    Da de baja a un suscriptor (soft delete).
     """
     correo = correo.strip().lower()
+    suscriptor = (
+        session.query(Suscriptor)
+        .filter_by(correo=correo, activo=True)
+        .first()
+    )
 
-    with _conectar() as conn:
-        cursor = conn.execute(
-            "UPDATE suscriptores SET activo = 0 WHERE correo = ? AND activo = 1",
-            (correo,)
-        )
-        conn.commit()
-
-    if cursor.rowcount == 0:
+    if not suscriptor:
         return {"ok": False, "mensaje": "Correo no encontrado o ya dado de baja"}
 
+    suscriptor.activo = False
+    session.flush()
+    log.info(f"Suscriptor desactivado: {correo}")
     return {"ok": True, "mensaje": "Suscripción cancelada correctamente"}
 
 
-def listar_todos(incluir_inactivos: bool = False) -> list[dict]:
+def listar_todos(session: Session, incluir_inactivos: bool = False) -> list[dict]:
     """
     Lista todos los suscriptores. Útil para admin/debug.
     """
-    query = "SELECT * FROM suscriptores"
+    query = session.query(Suscriptor)
     if not incluir_inactivos:
-        query += " WHERE activo = 1"
-    query += " ORDER BY fecha_suscripcion"
+        query = query.filter_by(activo=True)
 
-    with _conectar() as conn:
-        rows = conn.execute(query).fetchall()
-
-    return [dict(row) for row in rows]
-
-
-# ── Ejecución directa — demo y prueba ─────────────────────────────────────
-
-if __name__ == "__main__":
-    print("── Inicializando BD...")
-    inicializar_bd()
-
-    print("\n── Agregando suscriptores de prueba...")
-    casos = [
-        ("Mauricio",  "mauricio@gmail.com"),
-        ("Ana López", "ana@gmail.com"),
-        ("Mauricio",  "mauricio@gmail.com"),   # duplicado — debe manejarse
-        ("",          "sin-nombre@gmail.com"), # sin nombre — debe fallar
-        ("Juan",      "correo-invalido"),       # correo inválido
+    return [
+        {
+            "id":     s.id,
+            "nombre": s.nombre,
+            "correo": s.correo,
+            "activo": s.activo,
+            "fecha":  s.fecha_suscripcion.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        for s in query.order_by(Suscriptor.fecha_suscripcion).all()
     ]
-    for nombre, correo in casos:
-        resultado = agregar_suscriptor(nombre, correo)
-        estado = "✓" if resultado["ok"] else "✗"
-        print(f"  {estado} {correo:<28} → {resultado['mensaje']}")
-
-    print("\n── Suscriptores activos:")
-    for s in obtener_suscriptores_activos():
-        print(f"  [{s['id']}] {s['nombre']:<15} {s['correo']:<28} {s['fecha_suscripcion']}")
-
-    print("\n── Dando de baja a ana@gmail.com...")
-    print(" ", desactivar_suscriptor("ana@gmail.com")["mensaje"])
-
-    print("\n── Suscriptores activos después de baja:")
-    for s in obtener_suscriptores_activos():
-        print(f"  [{s['id']}] {s['nombre']:<15} {s['correo']}")
-
-    print("\n── Reactivando ana@gmail.com...")
-    print(" ", agregar_suscriptor("Ana López", "ana@gmail.com")["mensaje"])
-
-    print("\nDemo completada.")

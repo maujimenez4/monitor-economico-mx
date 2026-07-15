@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -50,3 +50,21 @@ class Historico(Base):
 
     def __repr__(self) -> str:
         return f"<Historico {self.serie_id} fecha={self.fecha} valor={self.valor}>"
+
+
+class Suscriptor(Base):
+    """
+    Suscriptores al reporte diario por correo.
+    Migrado de SQLite (suscriptores.db) a PostgreSQL.
+    Soft delete: activo=False en lugar de borrar el registro.
+    """
+    __tablename__ = "suscriptores"
+
+    id:                Mapped[int]      = mapped_column(Integer, primary_key=True)
+    nombre:            Mapped[str]      = mapped_column(String(100), nullable=False)
+    correo:            Mapped[str]      = mapped_column(String(150), nullable=False, unique=True)
+    fecha_suscripcion: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    activo:            Mapped[bool]     = mapped_column(Boolean, nullable=False, default=True)
+
+    def __repr__(self) -> str:
+        return f"<Suscriptor {self.correo} activo={self.activo}>"

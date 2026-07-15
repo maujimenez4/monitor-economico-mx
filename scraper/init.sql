@@ -23,6 +23,16 @@ CREATE TABLE IF NOT EXISTS historico (
     CONSTRAINT uq_historico_fecha_serie UNIQUE (fecha, serie_id)
 );
 
+CREATE TABLE IF NOT EXISTS suscriptores (
+    id                SERIAL PRIMARY KEY,
+    nombre            VARCHAR(100) NOT NULL,
+    correo            VARCHAR(150) NOT NULL,
+    fecha_suscripcion TIMESTAMP DEFAULT NOW(),
+    activo            BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_suscriptores_correo UNIQUE (correo)
+);
+
 -- Índices para las consultas más comunes
 CREATE INDEX IF NOT EXISTS idx_indicadores_fecha ON indicadores (fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_historico_serie   ON historico (serie_id, fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_suscriptores_activo ON suscriptores (activo, correo);
