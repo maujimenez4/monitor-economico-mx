@@ -1,0 +1,34 @@
+services:
+  - type: worker
+    name: monitor-scraper
+    runtime: python
+    pythonVersion: "3.12"
+    rootDir: scraper
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: BANXICO_TOKEN
+        sync: false
+      - key: INEGI_TOKEN
+        sync: false
+      - key: HORA_ENVIO
+        value: "07:30"
+      - key: GMAIL_USER
+        value: ""
+      - key: GMAIL_APP_PASSWORD
+        value: ""
+      - key: DESTINATARIO
+        value: ""
+
+  - type: web
+    name: monitor-fastapi
+    runtime: python
+    pythonVersion: "3.12"
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
