@@ -1,0 +1,11 @@
+# API
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Base de datos
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.10
+
+# Serialización — 2.12+ requerido para Python 3.14
+pydantic==2.12.0
+pydantic[email]==2.12.0
